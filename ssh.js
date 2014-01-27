@@ -4,12 +4,13 @@ var q = require('q');
 var c = new Connection();
 var fs = require('fs');
 var client = require('scp2');
+var AdmZip = require('adm-zip');
 
 var baseFolder = '/Users/Mukunda/Documents/mukundha/work/apimodel';
-var user = 'ec2-user' ;
-var host = '54.213.75.249';
+var user = 'root' ;
+var host = '54.213.61.244';
 
-var connectionString = user +'@' + host + ':/home/' + user ;
+var connectionString = user +'@' + host + ':/root' ;
 
 var apib = require(baseFolder + '/apib.js');
 
@@ -23,15 +24,25 @@ p.then(function(){
       username: user,
       privateKey: privateKey
     });
-    console.log('writing to server');
-    client.scp( baseFolder + '/apib/', connectionString + '/apib' , function(err) {
-      console.log(err);
-      dp.resolve({});
+    var zip = new AdmZip();
+    fs.readdir( baseFolder + '/apib/' , function(err,files){
+      for (var i in files){
+        if ( files[i].indexOf('.apib')){
+          zip.addLocalFile(baseFolder + '/apib/' + files[i]);
+        }
+      }
+      zip.writeZip( baseFolder + '/apib/apibtests.zip');
+      console.log('writing to server');
+      client.scp( baseFolder + '/apib/apibtests.zip', connectionString + '/apib' , function(err) {
+        console.log(err);
+        dp.resolve({});
+      });
     });
+    
     return dp.promise;
 }).then(function(){
    var dp = q.defer(); 
-  var commands = [] ;
+  var commands = [ 'unzip -o apib/apibtests.zip -d apib'] ;
   fs.readdir( baseFolder + '/apib', function(err,files){
     for (var i in files){
       if ( files[i].indexOf('.apib')>0){
@@ -39,6 +50,9 @@ p.then(function(){
         commands.push(command);
       }
     }
+    commands.push( 'rm -rf apib/*.json');
+    commands.push( 'rm -rf apib/*.apib');
+    commands.push( 'rm -rf apib/*.zip');
     dp.resolve({commands:commands});
   });
   return dp.promise;
